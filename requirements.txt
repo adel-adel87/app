@@ -1,0 +1,15 @@
+gradio
+pandas
+scikit-learn
+langdetect
+sentence-transformers
+pytesseract
+Pillow
+pdfplumber
+docx2txt
+opencv-python
+numpy
+transformers
+torch
+joblib
+openpyxl
