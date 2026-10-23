@@ -1,10 +1,4 @@
 # Install required libraries
-
-# Setup (run in terminal/Colab): pip install gradio pandas scikit-learn langdetect sentence-transformers pytesseract Pillow==12.2.0 pdfplumber docx2txt opencv-python numpy transformers torch
-
-# Setup (run in terminal/Colab): apt install libtesseract-dev
-
-# Setup (run in terminal/Colab): apt install libtesseract-dev
 # Import libraries
 
 import gradio as gr
@@ -47,9 +41,10 @@ import tempfile
 
 from io import BytesIO
 
-from google.colab import drive
+
 
 import shutil
+
 # Ensure consistent language detection
 
 DetectorFactory.seed = 0
@@ -58,23 +53,19 @@ DetectorFactory.seed = 0
 
 # Mount Google Drive
 
-drive.mount('/content/drive')
-
-
-
 # Define paths
 
-output_dir = '/content/drive/MyDrive/Adel/results'
+output_dir = str(RESULTS_DIR)
 
-archive_dir = '/content/drive/MyDrive/Adel/archive'
+archive_dir = str(ARCHIVE_DIR)
 
 dataset_paths = {
 
-    'ar': '/content/drive/MyDrive/Adel/Datasets/readme_ar.xlsx',
+    'ar': str(DATA_DIR / 'readme_ar.xlsx'),
 
-    'en': '/content/drive/MyDrive/Adel/Datasets/readme_en.xlsx',
+    'en': str(DATA_DIR / 'readme_en.xlsx'),
 
-    'ru': '/content/drive/MyDrive/Adel/Datasets/readme_ru.xlsx'
+    'ru': str(DATA_DIR / 'readme_ru.xlsx')
 
 }
 
@@ -87,24 +78,21 @@ os.makedirs(archive_dir, exist_ok=True)
 # Load saved models and utilities
 
 print("Loading saved models and utilities...")
-
-svm = joblib.load('/content/drive/MyDrive/Adel/Models/svm_model.joblib')
-
-rf = joblib.load('/content/drive/MyDrive/Adel/Models/rf_model.joblib')
-
-vectorizer = joblib.load('/content/drive/MyDrive/Adel/Models/vectorizer.joblib')
-
-le = joblib.load('/content/drive/MyDrive/Adel/Models/le.joblib')
-
-model_distilbert = AutoModelForSequenceClassification.from_pretrained('/content/drive/MyDrive/Adel/Models/distilbert_model')
-
-tokenizer_distilbert = AutoTokenizer.from_pretrained('/content/drive/MyDrive/Adel/Models/distilberttokenizer_model')
-
-
+svm = rf = vectorizer = le = model_distilbert = tokenizer_distilbert = None
+try:
+    svm = joblib.load(MODELS_DIR / "svm_model.joblib")
+    rf = joblib.load(MODELS_DIR / "rf_model.joblib")
+    vectorizer = joblib.load(MODELS_DIR / "vectorizer.joblib")
+    le = joblib.load(MODELS_DIR / "le.joblib")
+    model_distilbert = AutoModelForSequenceClassification.from_pretrained(MODELS_DIR / "distilbert_model")
+    tokenizer_distilbert = AutoTokenizer.from_pretrained(MODELS_DIR / "distilberttokenizer_model")
+    print("Models loaded.")
+except Exception as exc:
+    print(f"Model files unavailable; classification is disabled until models are installed: {exc}")
 
 # Define inverse label mapping for subdomains
 
-inverse_label_mapping = {i: label for i, label in enumerate(le.classes_)}
+inverse_label_mapping = ({i: label for i, label in enumerate(le.classes_)} if le is not None else {})
 
 
 
@@ -122,15 +110,12 @@ print("Models and utilities loaded successfully.")
 
 document_store = []
 
-accounts = {
-
-    "admin": {"username": "adel123", "password": "123", "role": "manager"},
-
-    "manager": {"username": "manager123", "password": "0000", "role": "manager"},
-
-    "employee": {"username": "ali123", "password": "123", "role": "employee"}
-
-}
+accounts = {}
+for role, env_prefix in (("manager", "APP_MANAGER"), ("employee", "APP_EMPLOYEE")):
+    username = os.getenv(f"{env_prefix}_USERNAME")
+    password = os.getenv(f"{env_prefix}_PASSWORD")
+    if username and password:
+        accounts[role] = {"username": username, "password": password, "role": role}
 
 current_user = {"username": None, "role": None}
 
@@ -1156,15 +1141,13 @@ def upload_and_analyze(file, title):
 
         keywords = extract_keywords(content)
 
-        file_type = "PDF" if hasattr(file_obj, 'name') and file_obj.name.endswith(".pdf") else \\
-
-                    "DOCX" if hasattr(file_obj, 'name') and file_obj.name.endswith(".docx") else \\
-
-                    "IMAGE" if hasattr(file_obj, 'name') and file_obj.name.lower().endswith((".png", ".jpg", ".jpeg")) else \\
-
-                    "TXT" if hasattr(file_obj, 'name') and file_obj.name.endswith(".txt") else "Unknown"
-
-        timestamp = datetime.datetime.now().strftime("%Y-%m-d %H:%M:%S")
+        file_type = (
+            "PDF" if getattr(file_obj, "name", "").lower().endswith(".pdf") else
+            "DOCX" if getattr(file_obj, "name", "").lower().endswith(".docx") else
+            "IMAGE" if getattr(file_obj, "name", "").lower().endswith((".png", ".jpg", ".jpeg")) else
+            "TXT" if getattr(file_obj, "name", "").lower().endswith(".txt") else "Unknown"
+        )
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 
@@ -1739,3 +1722,7 @@ with gr.Blocks(title="Smart Archiving System", theme=gr.themes.Soft()) as demo:
             logout_output = gr.Textbox(label="Status", value="")
 
             gr.Button("Logout").click(logout, outputs=logout_output)
+
+
+if __name__ == "__main__":
+    demo.launch()

@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+data/results/*
+data/archive/*
+data/datasets/*.xlsx
+models/*
+!models/README.md
+!data/datasets/README.md
